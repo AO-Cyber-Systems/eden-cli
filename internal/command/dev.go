@@ -22,11 +22,13 @@ to start a single server type.`,
 var (
 	devGoOnly      bool
 	devFlutterOnly bool
+	devUseDB       bool
 )
 
 func init() {
 	devCmd.Flags().BoolVar(&devGoOnly, "go-only", false, "Start only the Go server")
 	devCmd.Flags().BoolVar(&devFlutterOnly, "flutter-only", false, "Start only the Flutter server")
+	devCmd.Flags().BoolVar(&devUseDB, "db", false, "Use PostgreSQL instead of in-memory devstore for the Go server")
 }
 
 func runDev(cmd *cobra.Command, args []string) error {
@@ -42,6 +44,9 @@ func runDev(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "[eden] warning: no Go entrypoint found: %v\n", err)
 		} else {
+			if devUseDB {
+				goProc.Args = append(goProc.Args, "--", "--db")
+			}
 			procs = append(procs, goProc)
 		}
 	}
