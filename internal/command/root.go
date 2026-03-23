@@ -7,10 +7,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// version is set at build time via ldflags:
+//
+//	go build -ldflags="-X github.com/aocybersystems/eden/cli/internal/command.version=v1.0.0"
+var version = "dev"
+
 var rootCmd = &cobra.Command{
-	Use:   "eden",
-	Short: "Eden workspace manager",
-	Long:  "Eden is a workspace manager for Eden-based consumer product projects.",
+	Use:     "eden",
+	Short:   "Eden workspace manager",
+	Long:    "Eden is a workspace manager for Eden-based consumer product projects.",
+	Version: version,
 }
 
 func init() {
