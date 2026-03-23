@@ -18,6 +18,9 @@ func init() {
 	rootCmd.AddCommand(setupCmd)
 	rootCmd.AddCommand(generateCmd)
 	rootCmd.AddCommand(downCmd)
+	rootCmd.AddCommand(testCmd)
+	rootCmd.AddCommand(lintCmd)
+	rootCmd.AddCommand(checkCmd)
 }
 
 // Execute runs the root command with a background context.
