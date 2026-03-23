@@ -26,6 +26,7 @@ func init() {
 	rootCmd.AddCommand(downCmd)
 	rootCmd.AddCommand(testCmd)
 	rootCmd.AddCommand(lintCmd)
+	rootCmd.AddCommand(fmtCmd)
 	rootCmd.AddCommand(checkCmd)
 }
 
