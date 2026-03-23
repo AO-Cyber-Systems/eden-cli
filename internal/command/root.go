@@ -13,6 +13,10 @@ var rootCmd = &cobra.Command{
 	Long:  "Eden is a workspace manager for Eden-based consumer product projects.",
 }
 
+func init() {
+	rootCmd.AddCommand(devCmd)
+}
+
 // Execute runs the root command with a background context.
 // It exits with code 1 if the command returns an error.
 func Execute() {
