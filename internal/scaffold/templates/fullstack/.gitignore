@@ -1,0 +1,20 @@
+# Flutter
+.dart_tool/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.g.dart
+*.freezed.dart
+
+# Go
+vendor/
+*.test
+
+# Environment
+.env
+.eden.yaml
+
+# IDE
+.idea/
+.vscode/
+*.swp

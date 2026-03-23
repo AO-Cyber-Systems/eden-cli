@@ -1,0 +1,12 @@
+# Go
+vendor/
+*.test
+
+# Environment
+.env
+.eden.yaml
+
+# IDE
+.idea/
+.vscode/
+*.swp

@@ -1,0 +1,16 @@
+# Flutter
+.dart_tool/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.g.dart
+*.freezed.dart
+
+# Environment
+.env
+.eden.yaml
+
+# IDE
+.idea/
+.vscode/
+*.swp

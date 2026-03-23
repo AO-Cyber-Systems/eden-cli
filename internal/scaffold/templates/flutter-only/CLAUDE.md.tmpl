@@ -1,0 +1,23 @@
+# [[ .AppName ]]
+
+This workspace is an Eden Flutter-only app.
+
+## Package Responsibilities
+
+- `lib/` — Flutter application UI built on eden_platform_flutter and eden_ui_flutter
+
+## Commands
+
+| Command | Description |
+|---|---|
+| `eden setup` | Install dependencies (flutter pub get) |
+| `eden test` | Run all Flutter tests |
+| `eden lint` | Run flutter analyze |
+| `eden dev` | Start Flutter in watch mode |
+| `eden check` | Run lint + test together |
+
+## AI Guidance
+
+- Use eden_platform_flutter for shell orchestration (auth, company loading, navigation)
+- Use eden_ui_flutter for reusable UI widgets and tokens
+- Do not hand-edit files under `lib/src/gen/` — they are auto-generated

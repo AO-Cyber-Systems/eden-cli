@@ -1,0 +1,29 @@
+# [[ .AppName ]]
+
+This workspace is an Eden backend-only app with a Go server.
+
+## Package Responsibilities
+
+- `cmd/app/` — Go backend server entry point; registers ConnectRPC handlers
+
+## Source of Truth
+
+- Backend contracts are defined in `proto/`
+- Run `eden generate` after modifying `.proto` files to regenerate clients
+
+## Commands
+
+| Command | Description |
+|---|---|
+| `eden setup` | Install dependencies (go mod download) |
+| `eden generate` | Regenerate code from protobuf definitions |
+| `eden test` | Run all tests |
+| `eden lint` | Run linters (go vet) |
+| `eden dev` | Start backend server in watch mode |
+| `eden check` | Run lint + test together |
+| `eden down` | Stop local infrastructure (docker compose down) |
+
+## AI Guidance
+
+- Keep backend contracts in `proto/` — update `.proto` files first, then `eden generate`
+- Use eden-platform-go server patterns for ConnectRPC handler registration

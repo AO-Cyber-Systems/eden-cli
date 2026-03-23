@@ -1,0 +1,32 @@
+# [[ .AppName ]]
+
+This workspace is an Eden fullstack app with a Go backend and Flutter frontend.
+
+## Package Responsibilities
+
+- `cmd/app/` — Go backend server entry point; registers ConnectRPC handlers
+- Flutter app (`lib/`) — UI built on eden_platform_flutter and eden_ui_flutter
+
+## Source of Truth
+
+- Backend/frontend contracts are defined in `proto/`
+- Run `eden generate` after modifying `.proto` files to regenerate clients
+
+## Commands
+
+| Command | Description |
+|---|---|
+| `eden setup` | Install dependencies (go mod download, flutter pub get) |
+| `eden generate` | Regenerate code from protobuf definitions |
+| `eden test` | Run all tests (Go + Flutter) |
+| `eden lint` | Run linters (go vet, flutter analyze) |
+| `eden dev` | Start backend and Flutter in watch mode |
+| `eden check` | Run lint + test together |
+| `eden down` | Stop local infrastructure (docker compose down) |
+
+## AI Guidance
+
+- Keep backend contracts in `proto/` — update `.proto` files first, then `eden generate`
+- Use eden_platform_flutter for shell orchestration (auth, company loading, navigation)
+- Use eden_ui_flutter for reusable UI widgets and tokens
+- Do not hand-edit files under `lib/src/gen/` — they are auto-generated
