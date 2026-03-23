@@ -1,29 +1,32 @@
 # [[ .AppName ]]
 
-This workspace is an Eden backend-only app with a Go server.
+Eden backend-only workspace — Go server with ConnectRPC.
 
-## Package Responsibilities
+## Structure
 
-- `cmd/app/` — Go backend server entry point; registers ConnectRPC handlers
+- `cmd/app/` — Server entry point. Registers ConnectRPC handlers on `:8081`.
+- `proto/` — Protobuf service definitions (create this when adding APIs).
+- `compose.yaml` — Local PostgreSQL, NATS, MinIO.
 
-## Source of Truth
+## Dependencies
 
-- Backend contracts are defined in `proto/`
-- Run `eden generate` after modifying `.proto` files to regenerate clients
+This workspace depends on eden-libs packages:
+- **Go:** `eden-platform-go` via `go.mod` replace directive → `[[ .EdenLibsPath ]]/eden-platform-go`
 
 ## Commands
 
-| Command | Description |
-|---|---|
-| `eden setup` | Install dependencies (go mod download) |
-| `eden generate` | Regenerate code from protobuf definitions |
-| `eden test` | Run all tests |
-| `eden lint` | Run linters (go vet) |
-| `eden dev` | Start backend server in watch mode |
-| `eden check` | Run lint + test together |
-| `eden down` | Stop local infrastructure (docker compose down) |
+| Command | What it does |
+|---------|-------------|
+| `eden setup` | `go mod download` |
+| `eden generate` | `buf generate` from proto/ definitions |
+| `eden test` | `go test ./...` |
+| `eden lint` | `go vet ./...` |
+| `eden dev` | Start Go server |
+| `eden check` | generate → lint → test pipeline |
+| `eden down` | `docker compose down -v` |
 
 ## AI Guidance
 
-- Keep backend contracts in `proto/` — update `.proto` files first, then `eden generate`
-- Use eden-platform-go server patterns for ConnectRPC handler registration
+- **Contracts first:** edit `.proto` files, then `eden generate`, then update handlers.
+- **Go patterns:** follow eden-platform-go for ConnectRPC handler registration, middleware, auth.
+- **Local infra:** `compose.yaml` runs Postgres on `:5434`, NATS on `:4223`, MinIO on `:9002` (offset from eden-libs defaults).

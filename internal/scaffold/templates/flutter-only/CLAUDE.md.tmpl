@@ -1,23 +1,30 @@
 # [[ .AppName ]]
 
-This workspace is an Eden Flutter-only app.
+Eden Flutter-only workspace.
 
-## Package Responsibilities
+## Structure
 
-- `lib/` — Flutter application UI built on eden_platform_flutter and eden_ui_flutter
+- `lib/` — Flutter app. Uses eden_platform_flutter for auth/nav shell, eden_ui_flutter for widgets.
+
+## Dependencies
+
+This workspace depends on eden-libs packages:
+- **Flutter:** `eden_platform_flutter` and `eden_ui_flutter` via path deps → `[[ .EdenLibsPath ]]`
+- **Dart API:** `eden_platform_api_dart` for generated Connect clients → `[[ .EdenLibsPath ]]`
 
 ## Commands
 
-| Command | Description |
-|---|---|
-| `eden setup` | Install dependencies (flutter pub get) |
-| `eden test` | Run all Flutter tests |
-| `eden lint` | Run flutter analyze |
-| `eden dev` | Start Flutter in watch mode |
-| `eden check` | Run lint + test together |
+| Command | What it does |
+|---------|-------------|
+| `eden setup` | `flutter pub get` |
+| `eden test` | `flutter test` |
+| `eden lint` | `flutter analyze` |
+| `eden dev` | Start Flutter app (targets API at `localhost:8080`) |
+| `eden check` | lint → test pipeline |
 
 ## AI Guidance
 
-- Use eden_platform_flutter for shell orchestration (auth, company loading, navigation)
-- Use eden_ui_flutter for reusable UI widgets and tokens
-- Do not hand-edit files under `lib/src/gen/` — they are auto-generated
+- **Flutter patterns:** use Riverpod providers from eden_platform_flutter for auth/company/nav state.
+- **UI widgets:** use eden_ui_flutter tokens and components — keep transport-agnostic for UI concerns.
+- **Do not edit generated code** under `lib/src/gen/` — it is overwritten by `eden generate` in the backend workspace.
+- **API target:** `eden dev` passes `--dart-define=API_BASE_URL=http://localhost:8080` to connect to the platform dev server.

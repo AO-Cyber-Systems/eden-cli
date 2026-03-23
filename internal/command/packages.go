@@ -23,11 +23,24 @@ type Package struct {
 	Type PackageType
 }
 
-// detectPackages walks immediate subdirectories of root (including root itself)
-// and returns all packages found by inspecting go.mod and pubspec.yaml files.
+// detectPackages checks the root directory itself and its immediate
+// subdirectories for Go, Flutter, or Dart packages. This supports both
+// monorepo workspaces (eden-libs, where packages are subdirs) and consumer
+// workspaces (scaffolded by eden new, where go.mod/pubspec.yaml live at root).
 func detectPackages(root string) []Package {
 	var pkgs []Package
 
+	absRoot, err := filepath.Abs(root)
+	if err != nil {
+		return pkgs
+	}
+
+	// Check root itself — consumer workspaces have go.mod/pubspec.yaml here.
+	if pkg, ok := classifyDir(absRoot, filepath.Base(absRoot)); ok {
+		pkgs = append(pkgs, pkg)
+	}
+
+	// Check immediate subdirectories — monorepo workspaces have packages here.
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		return pkgs

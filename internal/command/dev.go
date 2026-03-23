@@ -113,8 +113,9 @@ func findGoCmdArgs(base string) (dir string, args []string, err error) {
 		}
 		mainFile := filepath.Join(cmdDir, e.Name(), "main.go")
 		if _, statErr := os.Stat(mainFile); statErr == nil {
-			// Use the package path relative to base.
-			relPkg := filepath.Join("./cmd", e.Name())
+			// Use the package path relative to base. filepath.Join strips
+			// the ./ prefix, but Go needs it to distinguish from stdlib paths.
+			relPkg := "./cmd/" + e.Name()
 			return base, []string{"run", relPkg}, nil
 		}
 	}

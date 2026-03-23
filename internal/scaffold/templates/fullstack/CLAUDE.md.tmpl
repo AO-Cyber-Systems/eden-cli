@@ -1,32 +1,38 @@
 # [[ .AppName ]]
 
-This workspace is an Eden fullstack app with a Go backend and Flutter frontend.
+Eden fullstack workspace — Go backend + Flutter frontend.
 
-## Package Responsibilities
+## Structure
 
-- `cmd/app/` — Go backend server entry point; registers ConnectRPC handlers
-- Flutter app (`lib/`) — UI built on eden_platform_flutter and eden_ui_flutter
+- `cmd/app/` — Go backend entry point. Registers ConnectRPC handlers on `:8081`.
+- `lib/` — Flutter app. Uses eden_platform_flutter for auth/nav shell, eden_ui_flutter for widgets.
+- `proto/` — Protobuf service definitions (create this when adding APIs).
+- `compose.yaml` — Local PostgreSQL, NATS, MinIO.
 
-## Source of Truth
+## Dependencies
 
-- Backend/frontend contracts are defined in `proto/`
-- Run `eden generate` after modifying `.proto` files to regenerate clients
+This workspace depends on eden-libs packages:
+- **Go:** `eden-platform-go` via `go.mod` replace directive → `[[ .EdenLibsPath ]]/eden-platform-go`
+- **Flutter:** `eden_platform_flutter` and `eden_ui_flutter` via path deps → `[[ .EdenLibsPath ]]`
+- **Dart API:** `eden_platform_api_dart` for generated Connect clients → `[[ .EdenLibsPath ]]`
 
 ## Commands
 
-| Command | Description |
-|---|---|
-| `eden setup` | Install dependencies (go mod download, flutter pub get) |
-| `eden generate` | Regenerate code from protobuf definitions |
-| `eden test` | Run all tests (Go + Flutter) |
-| `eden lint` | Run linters (go vet, flutter analyze) |
-| `eden dev` | Start backend and Flutter in watch mode |
-| `eden check` | Run lint + test together |
-| `eden down` | Stop local infrastructure (docker compose down) |
+| Command | What it does |
+|---------|-------------|
+| `eden setup` | `go mod download` + `flutter pub get` |
+| `eden generate` | `buf generate` from proto/ definitions |
+| `eden test` | `go test ./...` + `flutter test` |
+| `eden lint` | `go vet ./...` + `flutter analyze` |
+| `eden dev` | Start Go + Flutter servers concurrently |
+| `eden check` | generate → lint → test pipeline |
+| `eden down` | `docker compose down -v` |
 
 ## AI Guidance
 
-- Keep backend contracts in `proto/` — update `.proto` files first, then `eden generate`
-- Use eden_platform_flutter for shell orchestration (auth, company loading, navigation)
-- Use eden_ui_flutter for reusable UI widgets and tokens
-- Do not hand-edit files under `lib/src/gen/` — they are auto-generated
+- **Contracts first:** edit `.proto` files, then `eden generate`, then update handlers/providers.
+- **Do not edit generated code** under `lib/src/gen/` — it is overwritten by `eden generate`.
+- **Go patterns:** follow eden-platform-go for ConnectRPC handler registration, middleware, auth.
+- **Flutter patterns:** use Riverpod providers from eden_platform_flutter for auth/company/nav state.
+- **UI widgets:** use eden_ui_flutter tokens and components — keep this workspace transport-agnostic for UI.
+- **Local infra:** `compose.yaml` runs Postgres on `:5434`, NATS on `:4223`, MinIO on `:9002` (offset from eden-libs defaults).
