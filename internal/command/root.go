@@ -15,6 +15,9 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(devCmd)
+	rootCmd.AddCommand(setupCmd)
+	rootCmd.AddCommand(generateCmd)
+	rootCmd.AddCommand(downCmd)
 }
 
 // Execute runs the root command with a background context.
