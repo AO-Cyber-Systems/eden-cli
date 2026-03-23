@@ -1,0 +1,54 @@
+version: 2
+
+project_name: eden
+
+builds:
+  - id: eden
+    dir: .
+    main: ./cmd/eden
+    binary: eden
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/aocybersystems/eden/cli/internal/command.version={{.Version}}
+
+archives:
+  - id: eden
+    builds:
+      - eden
+    name_template: "eden_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: darwin
+        format: zip
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore\\(deps\\):"
+  groups:
+    - title: Features
+      regexp: '^feat'
+    - title: Bug Fixes
+      regexp: '^fix'
+    - title: Other
+      order: 999
+
+release:
+  github:
+    owner: aocybersystems
+    name: eden-libs
+  draft: true
+  prerelease: auto
