@@ -15,6 +15,7 @@ type Config struct {
 	HTTPSPort   int           // default 443
 	IdleTimeout time.Duration // default 15min
 	Domain      string        // default "eden.test"
+	HighPorts   bool          // use unprivileged ports (9280/9283) instead of 80/443
 }
 
 // DefaultConfig returns a Config with sensible defaults.
@@ -35,6 +36,8 @@ type Daemon struct {
 	State  *State
 	dns    *DNSServer
 	ca     *CA
+	proxy  *Proxy
+	pool   *Pool
 }
 
 // Run starts the daemon and blocks until ctx is cancelled. It starts the DNS
@@ -64,6 +67,14 @@ func (d *Daemon) Run(ctx context.Context) error {
 	d.ca = ca
 	slog.Info("eden daemon CA ready", "cert", filepath.Join(caDir, caCertFile))
 
+	// Determine effective ports.
+	httpPort := d.Config.HTTPPort
+	httpsPort := d.Config.HTTPSPort
+	if d.Config.HighPorts {
+		httpPort = 9280
+		httpsPort = 9283
+	}
+
 	// Start DNS server.
 	d.dns = NewDNSServer(d.Config.Domain, d.Config.DNSPort)
 	dnsErrCh := make(chan error, 1)
@@ -74,9 +85,35 @@ func (d *Daemon) Run(ctx context.Context) error {
 		}
 	}()
 
-	slog.Info("eden daemon running")
+	// Create reverse proxy.
+	d.proxy = NewProxy(d.State, ca, d.Config.Domain, httpPort, httpsPort)
 
-	// Block until context is cancelled or DNS fails.
+	// Create process pool and wire it into the proxy.
+	logsDir, err := LogsDir()
+	if err != nil {
+		return fmt.Errorf("resolving logs directory: %w", err)
+	}
+	d.pool = NewPool(d.State, logsDir, d.Config.IdleTimeout)
+	d.proxy.OnRequest = d.pool.EnsureRunning
+
+	// Start idle monitor.
+	go d.pool.StartIdleMonitor(ctx)
+
+	// Start proxy servers.
+	proxyErrCh := make(chan error, 1)
+	go func() {
+		if err := d.proxy.ListenAndServe(ctx); err != nil {
+			slog.Error("proxy server error", "error", err)
+			proxyErrCh <- err
+		}
+	}()
+
+	slog.Info("eden daemon running",
+		"http_port", httpPort,
+		"https_port", httpsPort,
+	)
+
+	// Block until context is cancelled or a subsystem fails.
 	select {
 	case <-ctx.Done():
 		slog.Info("eden daemon shutting down")
@@ -84,13 +121,35 @@ func (d *Daemon) Run(ctx context.Context) error {
 		slog.Error("eden daemon: DNS server failed, shutting down", "error", err)
 		_ = d.Shutdown()
 		return fmt.Errorf("dns server: %w", err)
+	case err := <-proxyErrCh:
+		slog.Error("eden daemon: proxy server failed, shutting down", "error", err)
+		_ = d.Shutdown()
+		return fmt.Errorf("proxy server: %w", err)
 	}
 
 	return d.Shutdown()
 }
 
-// Shutdown gracefully stops all daemon subsystems.
+// Shutdown gracefully stops all daemon subsystems. Process pool is stopped
+// first to ensure clean process cleanup before proxy and DNS shut down.
 func (d *Daemon) Shutdown() error {
+	// Stop all workspace processes first.
+	if d.pool != nil {
+		if err := d.pool.StopAll(); err != nil {
+			slog.Error("pool shutdown error", "error", err)
+		}
+	}
+
+	// Stop proxy servers.
+	if d.proxy != nil {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := d.proxy.Shutdown(shutdownCtx); err != nil {
+			slog.Error("proxy shutdown error", "error", err)
+		}
+	}
+
+	// Stop DNS server.
 	if d.dns != nil {
 		if err := d.dns.Shutdown(); err != nil {
 			slog.Error("dns shutdown error", "error", err)

@@ -349,13 +349,27 @@ func workspaceURL(name, domain string, httpsPort int) string {
 }
 
 var dashboardTmpl = template.Must(template.New("dashboard").Funcs(template.FuncMap{
-	"workspaceURL": workspaceURL,
+	"workspaceURL":   workspaceURL,
+	"formatDuration": formatDuration,
+	"wsUptime": func(ws *WorkspaceState) string {
+		if ws.Started.IsZero() || ws.Status != "running" {
+			return "-"
+		}
+		return formatDuration(time.Since(ws.Started).Truncate(time.Second))
+	},
+	"wsLastReq": func(ws *WorkspaceState) string {
+		if ws.LastReq.IsZero() {
+			return "-"
+		}
+		ago := time.Since(ws.LastReq).Truncate(time.Second)
+		return formatDuration(ago) + " ago"
+	},
 }).Parse(`<!DOCTYPE html>
 <html>
 <head>
   <title>Eden Dev Server</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #333; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 960px; margin: 40px auto; padding: 0 20px; color: #333; }
     h1 { color: #1a1a2e; }
     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
     th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #e0e0e0; }
@@ -368,6 +382,7 @@ var dashboardTmpl = template.Must(template.New("dashboard").Funcs(template.FuncM
     .status-starting { background: #fff3cd; color: #856404; }
     .status-idle { background: #e2e3e5; color: #383d41; }
     .meta { color: #666; font-size: 14px; margin-top: 8px; }
+    .pid { font-family: monospace; font-size: 13px; color: #666; }
   </style>
 </head>
 <body>
@@ -375,12 +390,15 @@ var dashboardTmpl = template.Must(template.New("dashboard").Funcs(template.FuncM
   <p class="meta">Domain: {{.Domain}} | Uptime: {{.Uptime}} | Workspaces: {{len .Workspaces}}</p>
   {{if .Workspaces}}
   <table>
-    <tr><th>Workspace</th><th>Status</th><th>Port</th><th>URL</th></tr>
+    <tr><th>Workspace</th><th>Status</th><th>Port</th><th>PID</th><th>Uptime</th><th>Last Request</th><th>URL</th></tr>
     {{range .Workspaces}}
     <tr>
       <td>{{.Name}}</td>
       <td><span class="status status-{{.Status}}">{{.Status}}</span></td>
       <td>{{if .Port}}{{.Port}}{{else}}-{{end}}</td>
+      <td class="pid">{{if .PID}}{{.PID}}{{else}}-{{end}}</td>
+      <td>{{wsUptime .}}</td>
+      <td>{{wsLastReq .}}</td>
       <td><a href="{{workspaceURL .Name $.Domain $.HTTPSPort}}">{{workspaceURL .Name $.Domain $.HTTPSPort}}</a></td>
     </tr>
     {{end}}
