@@ -15,8 +15,9 @@ import (
 )
 
 var (
-	teardownForce  bool
-	daemonHighPort bool
+	teardownForce        bool
+	daemonHighPort       bool
+	androidReversePorts  []int
 )
 
 func init() {
@@ -27,9 +28,12 @@ func init() {
 	devCmd.AddCommand(devStatusCmd)
 	devCmd.AddCommand(devDaemonCmd)
 	devCmd.AddCommand(devLogsCmd)
+	devCmd.AddCommand(devTrustSimCmd)
+	devCmd.AddCommand(devAndroidReverseCmd)
 
 	devTeardownCmd.Flags().BoolVar(&teardownForce, "force", false, "Remove CA certificates without prompting")
 	devDaemonCmd.Flags().BoolVar(&daemonHighPort, "high-ports", false, "Use ports 9280/9283 instead of 80/443 (no LaunchAgent needed)")
+	devAndroidReverseCmd.Flags().IntSliceVar(&androidReversePorts, "ports", nil, "Additional ports to forward (e.g. --ports 9300,9301)")
 }
 
 // --- eden dev setup ---
@@ -328,6 +332,92 @@ func runDevLogs(cmd *cobra.Command, _ []string) error {
 	tailCmd.Stdout = os.Stdout
 	tailCmd.Stderr = os.Stderr
 	return tailCmd.Run()
+}
+
+// --- eden dev trust-simulator ---
+
+var devTrustSimCmd = &cobra.Command{
+	Use:   "trust-simulator",
+	Short: "Install Eden CA certificate in iOS simulator",
+	Long: `Installs the Eden Dev CA certificate in all currently booted iOS simulators
+for trusted HTTPS connections to *.eden.test domains.
+
+Uses 'xcrun simctl keychain add-root-cert' (Xcode 14+) for silent installation.
+Falls back to opening the certificate in simulator Safari for manual install on
+older Xcode versions.
+
+The iOS simulator shares the host's network stack, so DNS resolution for
+*.eden.test domains works automatically. Only the CA certificate needs to be
+installed separately.`,
+	RunE: runTrustSimulator,
+}
+
+func runTrustSimulator(_ *cobra.Command, _ []string) error {
+	fmt.Println("[eden] Installing CA certificate in iOS simulator...")
+
+	caDir, err := daemon.CADir()
+	if err != nil {
+		return fmt.Errorf("resolving CA directory: %w", err)
+	}
+
+	if err := daemon.TrustSimulatorCA(caDir); err != nil {
+		return err
+	}
+
+	fmt.Println("\n[eden] iOS simulator CA trust complete!")
+	fmt.Println("  Your simulator can now access https://<workspace>.eden.test")
+	return nil
+}
+
+// --- eden dev android-reverse ---
+
+var devAndroidReverseCmd = &cobra.Command{
+	Use:   "android-reverse",
+	Short: "Set up adb port forwarding for Android emulator",
+	Long: `Forwards HTTP (80) and HTTPS (443) ports from the Android emulator to the host
+machine, allowing the emulator to reach Eden dev server domains on localhost.
+
+The Android emulator uses NAT, so the host's localhost is not directly reachable.
+This command uses 'adb reverse' to map emulator ports to host ports.
+
+Additional workspace-specific ports can be forwarded with --ports:
+  eden dev android-reverse --ports 9300,9301
+
+For HTTPS to work, your Android app needs a network security config that trusts
+user-installed CA certificates (required for API 24+). This command prints the
+necessary XML configuration.`,
+	RunE: runAndroidReverse,
+}
+
+func runAndroidReverse(_ *cobra.Command, _ []string) error {
+	fmt.Println("[eden] Setting up Android emulator port forwarding...")
+
+	// Default ports: HTTP and HTTPS.
+	ports := []int{80, 443}
+
+	// Append any user-specified ports.
+	for _, p := range androidReversePorts {
+		ports = append(ports, p)
+	}
+
+	if err := daemon.SetupAndroidReverse(ports); err != nil {
+		return err
+	}
+
+	// Show current forwarding rules.
+	rules, err := daemon.ListAndroidForwards()
+	if err == nil && len(rules) > 0 {
+		fmt.Println("\n  Active forwarding rules:")
+		for _, r := range rules {
+			fmt.Printf("    %s\n", r)
+		}
+	}
+
+	// Print Android security config guidance.
+	daemon.PrintAndroidSecurityConfig()
+
+	fmt.Println("\n[eden] Android emulator port forwarding complete!")
+	return nil
 }
 
 // --- helpers ---
