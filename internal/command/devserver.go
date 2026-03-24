@@ -49,7 +49,25 @@ func runDevSetup(cmd *cobra.Command, _ []string) error {
 	}
 	fmt.Println("  Created ~/.eden/ directory structure")
 
-	// 2. Write /etc/resolver/test (requires sudo).
+	// 2. Create and trust CA certificate.
+	caDir, err := daemon.CADir()
+	if err != nil {
+		return fmt.Errorf("resolving CA directory: %w", err)
+	}
+	ca, err := daemon.LoadOrCreateCA(caDir)
+	if err != nil {
+		return fmt.Errorf("creating CA: %w", err)
+	}
+	fmt.Println("  CA certificate ready")
+
+	certPath := ca.CertPEMPath(caDir)
+	if err := daemon.TrustCA(certPath); err != nil {
+		fmt.Fprintf(os.Stderr, "  Warning: could not trust CA: %v\n", err)
+	} else {
+		fmt.Println("  CA certificate trusted in macOS keychain")
+	}
+
+	// 3. Write /etc/resolver/test (requires sudo).
 	resolverContent := "nameserver 127.0.0.1\nport 9253\n"
 	sudoTee := exec.CommandContext(cmd.Context(), "sudo", "tee", "/etc/resolver/test")
 	sudoTee.Stdin = strings.NewReader(resolverContent)

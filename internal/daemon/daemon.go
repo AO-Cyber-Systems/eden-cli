@@ -2,7 +2,9 @@ package daemon
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"path/filepath"
 	"time"
 )
 
@@ -27,16 +29,16 @@ func DefaultConfig() *Config {
 }
 
 // Daemon is the main eden dev server daemon. It manages DNS resolution, TLS
-// termination, reverse proxying, and workspace process lifecycle. DNS, proxy,
-// and pool subsystems will be wired in subsequent TRDs.
+// termination, reverse proxying, and workspace process lifecycle.
 type Daemon struct {
 	Config *Config
 	State  *State
+	dns    *DNSServer
+	ca     *CA
 }
 
-// Run starts the daemon and blocks until ctx is cancelled. Subsystem startup
-// (DNS, proxy, process pool) will be added by later TRDs; for now it logs
-// startup and waits for shutdown.
+// Run starts the daemon and blocks until ctx is cancelled. It starts the DNS
+// server and loads (or creates) the local CA for TLS certificate generation.
 func (d *Daemon) Run(ctx context.Context) error {
 	slog.Info("eden daemon starting",
 		"domain", d.Config.Domain,
@@ -45,16 +47,60 @@ func (d *Daemon) Run(ctx context.Context) error {
 		"https_port", d.Config.HTTPSPort,
 	)
 
-	// Block until context is cancelled (e.g. SIGINT/SIGTERM).
-	<-ctx.Done()
+	// Ensure config directories exist.
+	if err := EnsureConfigDirs(); err != nil {
+		return fmt.Errorf("creating config dirs: %w", err)
+	}
 
-	slog.Info("eden daemon shutting down")
+	// Load or create CA.
+	caDir, err := CADir()
+	if err != nil {
+		return fmt.Errorf("resolving CA directory: %w", err)
+	}
+	ca, err := LoadOrCreateCA(caDir)
+	if err != nil {
+		return fmt.Errorf("loading CA: %w", err)
+	}
+	d.ca = ca
+	slog.Info("eden daemon CA ready", "cert", filepath.Join(caDir, caCertFile))
+
+	// Start DNS server.
+	d.dns = NewDNSServer(d.Config.Domain, d.Config.DNSPort)
+	dnsErrCh := make(chan error, 1)
+	go func() {
+		if err := d.dns.ListenAndServe(); err != nil {
+			slog.Error("dns server error", "error", err)
+			dnsErrCh <- err
+		}
+	}()
+
+	slog.Info("eden daemon running")
+
+	// Block until context is cancelled or DNS fails.
+	select {
+	case <-ctx.Done():
+		slog.Info("eden daemon shutting down")
+	case err := <-dnsErrCh:
+		slog.Error("eden daemon: DNS server failed, shutting down", "error", err)
+		_ = d.Shutdown()
+		return fmt.Errorf("dns server: %w", err)
+	}
+
 	return d.Shutdown()
 }
 
-// Shutdown gracefully stops all daemon subsystems. Currently a no-op; will be
-// expanded as subsystems are added.
+// Shutdown gracefully stops all daemon subsystems.
 func (d *Daemon) Shutdown() error {
+	if d.dns != nil {
+		if err := d.dns.Shutdown(); err != nil {
+			slog.Error("dns shutdown error", "error", err)
+		}
+	}
 	slog.Info("eden daemon stopped")
 	return nil
+}
+
+// CA returns the daemon's certificate authority, or nil if not yet loaded.
+func (d *Daemon) CA() *CA {
+	return d.ca
 }
