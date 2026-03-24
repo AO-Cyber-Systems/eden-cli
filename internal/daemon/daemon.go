@@ -2,7 +2,9 @@ package daemon
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"path/filepath"
 	"time"
 )
 
@@ -13,7 +15,6 @@ type Config struct {
 	HTTPSPort   int           // default 443
 	IdleTimeout time.Duration // default 15min
 	Domain      string        // default "eden.test"
-	HighPorts   bool          // use 9280/9283 instead of 80/443
 }
 
 // DefaultConfig returns a Config with sensible defaults.
@@ -27,86 +28,79 @@ func DefaultConfig() *Config {
 	}
 }
 
-// EffectiveHTTPPort returns the HTTP port, accounting for HighPorts mode.
-func (c *Config) EffectiveHTTPPort() int {
-	if c.HighPorts {
-		return 9280
-	}
-	return c.HTTPPort
-}
-
-// EffectiveHTTPSPort returns the HTTPS port, accounting for HighPorts mode.
-func (c *Config) EffectiveHTTPSPort() int {
-	if c.HighPorts {
-		return 9283
-	}
-	return c.HTTPSPort
-}
-
 // Daemon is the main eden dev server daemon. It manages DNS resolution, TLS
 // termination, reverse proxying, and workspace process lifecycle.
 type Daemon struct {
 	Config *Config
 	State  *State
-	proxy  *Proxy
-
-	// CertProvider is set by the TLS subsystem (TRD-02) before Run() is called.
-	// If nil, the proxy runs without HTTPS (HTTP-only mode for testing).
-	CertProvider CertProvider
+	dns    *DNSServer
+	ca     *CA
 }
 
-// Run starts the daemon and blocks until ctx is cancelled. It starts the
-// reverse proxy servers and waits for shutdown.
+// Run starts the daemon and blocks until ctx is cancelled. It starts the DNS
+// server and loads (or creates) the local CA for TLS certificate generation.
 func (d *Daemon) Run(ctx context.Context) error {
-	httpPort := d.Config.EffectiveHTTPPort()
-	httpsPort := d.Config.EffectiveHTTPSPort()
-
 	slog.Info("eden daemon starting",
 		"domain", d.Config.Domain,
 		"dns_port", d.Config.DNSPort,
-		"http_port", httpPort,
-		"https_port", httpsPort,
-		"high_ports", d.Config.HighPorts,
+		"http_port", d.Config.HTTPPort,
+		"https_port", d.Config.HTTPSPort,
 	)
 
-	// Create and start the reverse proxy.
-	d.proxy = NewProxy(d.State, d.CertProvider, d.Config.Domain, httpPort, httpsPort)
+	// Ensure config directories exist.
+	if err := EnsureConfigDirs(); err != nil {
+		return fmt.Errorf("creating config dirs: %w", err)
+	}
 
-	// Start proxy in background goroutine.
-	proxyErrCh := make(chan error, 1)
+	// Load or create CA.
+	caDir, err := CADir()
+	if err != nil {
+		return fmt.Errorf("resolving CA directory: %w", err)
+	}
+	ca, err := LoadOrCreateCA(caDir)
+	if err != nil {
+		return fmt.Errorf("loading CA: %w", err)
+	}
+	d.ca = ca
+	slog.Info("eden daemon CA ready", "cert", filepath.Join(caDir, caCertFile))
+
+	// Start DNS server.
+	d.dns = NewDNSServer(d.Config.Domain, d.Config.DNSPort)
+	dnsErrCh := make(chan error, 1)
 	go func() {
-		proxyErrCh <- d.proxy.ListenAndServe(ctx)
+		if err := d.dns.ListenAndServe(); err != nil {
+			slog.Error("dns server error", "error", err)
+			dnsErrCh <- err
+		}
 	}()
 
-	if d.CertProvider != nil {
-		slog.Info("HTTPS proxy listening", "port", httpsPort)
-	} else {
-		slog.Warn("HTTPS proxy disabled (no TLS certificates available)")
+	slog.Info("eden daemon running")
+
+	// Block until context is cancelled or DNS fails.
+	select {
+	case <-ctx.Done():
+		slog.Info("eden daemon shutting down")
+	case err := <-dnsErrCh:
+		slog.Error("eden daemon: DNS server failed, shutting down", "error", err)
+		_ = d.Shutdown()
+		return fmt.Errorf("dns server: %w", err)
 	}
-	slog.Info("HTTP redirect listening", "port", httpPort)
 
-	// Block until context is cancelled (e.g. SIGINT/SIGTERM).
-	<-ctx.Done()
-
-	slog.Info("eden daemon shutting down")
 	return d.Shutdown()
 }
 
-// Shutdown gracefully stops all daemon subsystems with a 5-second timeout.
+// Shutdown gracefully stops all daemon subsystems.
 func (d *Daemon) Shutdown() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	var firstErr error
-
-	// Shutdown proxy servers.
-	if d.proxy != nil {
-		if err := d.proxy.Shutdown(ctx); err != nil {
-			slog.Error("proxy shutdown error", "error", err)
-			firstErr = err
+	if d.dns != nil {
+		if err := d.dns.Shutdown(); err != nil {
+			slog.Error("dns shutdown error", "error", err)
 		}
 	}
-
 	slog.Info("eden daemon stopped")
-	return firstErr
+	return nil
+}
+
+// CA returns the daemon's certificate authority, or nil if not yet loaded.
+func (d *Daemon) CA() *CA {
+	return d.ca
 }
