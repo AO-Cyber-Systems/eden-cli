@@ -14,7 +14,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var teardownForce bool
+var (
+	teardownForce  bool
+	daemonHighPort bool
+)
 
 func init() {
 	devCmd.AddCommand(devSetupCmd)
@@ -26,6 +29,7 @@ func init() {
 	devCmd.AddCommand(devLogsCmd)
 
 	devTeardownCmd.Flags().BoolVar(&teardownForce, "force", false, "Remove CA certificates without prompting")
+	devDaemonCmd.Flags().BoolVar(&daemonHighPort, "high-ports", false, "Use ports 9280/9283 instead of 80/443 (no LaunchAgent needed)")
 }
 
 // --- eden dev setup ---
@@ -277,8 +281,11 @@ func runDevDaemon(cmd *cobra.Command, _ []string) error {
 	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	cfg := daemon.DefaultConfig()
+	cfg.HighPorts = daemonHighPort
+
 	d := &daemon.Daemon{
-		Config: daemon.DefaultConfig(),
+		Config: cfg,
 		State:  daemon.NewState(),
 	}
 	return d.Run(ctx)

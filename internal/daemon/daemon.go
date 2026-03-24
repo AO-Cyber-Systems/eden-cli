@@ -13,6 +13,7 @@ type Config struct {
 	HTTPSPort   int           // default 443
 	IdleTimeout time.Duration // default 15min
 	Domain      string        // default "eden.test"
+	HighPorts   bool          // use 9280/9283 instead of 80/443
 }
 
 // DefaultConfig returns a Config with sensible defaults.
@@ -26,24 +27,63 @@ func DefaultConfig() *Config {
 	}
 }
 
+// EffectiveHTTPPort returns the HTTP port, accounting for HighPorts mode.
+func (c *Config) EffectiveHTTPPort() int {
+	if c.HighPorts {
+		return 9280
+	}
+	return c.HTTPPort
+}
+
+// EffectiveHTTPSPort returns the HTTPS port, accounting for HighPorts mode.
+func (c *Config) EffectiveHTTPSPort() int {
+	if c.HighPorts {
+		return 9283
+	}
+	return c.HTTPSPort
+}
+
 // Daemon is the main eden dev server daemon. It manages DNS resolution, TLS
-// termination, reverse proxying, and workspace process lifecycle. DNS, proxy,
-// and pool subsystems will be wired in subsequent TRDs.
+// termination, reverse proxying, and workspace process lifecycle.
 type Daemon struct {
 	Config *Config
 	State  *State
+	proxy  *Proxy
+
+	// CertProvider is set by the TLS subsystem (TRD-02) before Run() is called.
+	// If nil, the proxy runs without HTTPS (HTTP-only mode for testing).
+	CertProvider CertProvider
 }
 
-// Run starts the daemon and blocks until ctx is cancelled. Subsystem startup
-// (DNS, proxy, process pool) will be added by later TRDs; for now it logs
-// startup and waits for shutdown.
+// Run starts the daemon and blocks until ctx is cancelled. It starts the
+// reverse proxy servers and waits for shutdown.
 func (d *Daemon) Run(ctx context.Context) error {
+	httpPort := d.Config.EffectiveHTTPPort()
+	httpsPort := d.Config.EffectiveHTTPSPort()
+
 	slog.Info("eden daemon starting",
 		"domain", d.Config.Domain,
 		"dns_port", d.Config.DNSPort,
-		"http_port", d.Config.HTTPPort,
-		"https_port", d.Config.HTTPSPort,
+		"http_port", httpPort,
+		"https_port", httpsPort,
+		"high_ports", d.Config.HighPorts,
 	)
+
+	// Create and start the reverse proxy.
+	d.proxy = NewProxy(d.State, d.CertProvider, d.Config.Domain, httpPort, httpsPort)
+
+	// Start proxy in background goroutine.
+	proxyErrCh := make(chan error, 1)
+	go func() {
+		proxyErrCh <- d.proxy.ListenAndServe(ctx)
+	}()
+
+	if d.CertProvider != nil {
+		slog.Info("HTTPS proxy listening", "port", httpsPort)
+	} else {
+		slog.Warn("HTTPS proxy disabled (no TLS certificates available)")
+	}
+	slog.Info("HTTP redirect listening", "port", httpPort)
 
 	// Block until context is cancelled (e.g. SIGINT/SIGTERM).
 	<-ctx.Done()
@@ -52,9 +92,21 @@ func (d *Daemon) Run(ctx context.Context) error {
 	return d.Shutdown()
 }
 
-// Shutdown gracefully stops all daemon subsystems. Currently a no-op; will be
-// expanded as subsystems are added.
+// Shutdown gracefully stops all daemon subsystems with a 5-second timeout.
 func (d *Daemon) Shutdown() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var firstErr error
+
+	// Shutdown proxy servers.
+	if d.proxy != nil {
+		if err := d.proxy.Shutdown(ctx); err != nil {
+			slog.Error("proxy shutdown error", "error", err)
+			firstErr = err
+		}
+	}
+
 	slog.Info("eden daemon stopped")
-	return nil
+	return firstErr
 }
