@@ -1,0 +1,17 @@
+name: eden-cli
+id: ari:cloud:compass:53f8835e-3a18-4994-a3e1-d88c2018a416:component/546e2675-3811-412b-8126-f0637fd7307c/ad8424d2-1fdb-4cca-8e0f-750a9cb9ad84
+description: Eden developer CLI — workspace orchestration and consumer sync tooling
+configVersion: 1
+typeId: SERVICE
+fields:
+  tier: 4
+links:
+  - name: null
+    type: REPOSITORY
+    url: https://github.com/AO-Cyber-Systems/eden-cli
+relationships:
+  DEPENDS_ON: []
+labels:
+  - source:github
+  - synced-with-jsm
+customFields: null
