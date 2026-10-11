@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"text/tabwriter"
 
-	"github.com/aocybersystems/eden/cli/internal/daemon"
+	"go.aocyber.ai/eden-cli/internal/daemon"
 	"github.com/spf13/cobra"
 )
 

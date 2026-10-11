@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/aocybersystems/eden/cli/internal/runner"
 	"github.com/spf13/cobra"
+	"go.aocyber.ai/eden-cli/internal/runner"
 )
 
 var lintCmd = &cobra.Command{

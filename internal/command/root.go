@@ -9,7 +9,7 @@ import (
 
 // version is set at build time via ldflags:
 //
-//	go build -ldflags="-X github.com/aocybersystems/eden/cli/internal/command.version=v1.0.0"
+//	go build -ldflags="-X go.aocyber.ai/eden-cli/internal/command.version=v1.0.0"
 var version = "dev"
 
 var rootCmd = &cobra.Command{

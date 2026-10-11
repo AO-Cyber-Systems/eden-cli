@@ -3,8 +3,8 @@ package command
 import (
 	"fmt"
 
-	"github.com/aocybersystems/eden/cli/internal/runner"
 	"github.com/spf13/cobra"
+	"go.aocyber.ai/eden-cli/internal/runner"
 )
 
 var fmtCmd = &cobra.Command{

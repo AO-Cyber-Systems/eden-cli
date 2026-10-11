@@ -19,7 +19,7 @@ func WriteGoMod(destDir, modulePath, edenLibsPath string) error {
 		return fmt.Errorf("parsing base go.mod: %w", err)
 	}
 
-	if err := f.AddRequire("github.com/aocybersystems/eden-platform-go", "v0.0.0"); err != nil {
+	if err := f.AddRequire("go.aocyber.ai/eden-platform-go", "v0.0.0"); err != nil {
 		return fmt.Errorf("adding eden-platform-go require: %w", err)
 	}
 
@@ -28,7 +28,7 @@ func WriteGoMod(destDir, modulePath, edenLibsPath string) error {
 	}
 
 	platformGoPath := filepath.Join(edenLibsPath, "eden-platform-go")
-	if err := f.AddReplace("github.com/aocybersystems/eden-platform-go", "", platformGoPath, ""); err != nil {
+	if err := f.AddReplace("go.aocyber.ai/eden-platform-go", "", platformGoPath, ""); err != nil {
 		return fmt.Errorf("adding replace directive: %w", err)
 	}
 
