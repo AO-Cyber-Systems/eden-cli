@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/aocybersystems/eden/cli/internal/runner"
 	"github.com/spf13/cobra"
+	"go.aocyber.ai/eden-cli/internal/runner"
 )
 
 var devCmd = &cobra.Command{

@@ -1,4 +1,4 @@
-module github.com/aocybersystems/eden/cli
+module go.aocyber.ai/eden-cli
 
 go 1.26.1
 

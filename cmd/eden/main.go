@@ -1,6 +1,6 @@
 package main
 
-import "github.com/aocybersystems/eden/cli/internal/command"
+import "go.aocyber.ai/eden-cli/internal/command"
 
 func main() {
 	command.Execute()

@@ -264,7 +264,7 @@ func parseGoModForEden(gomodPath, dir string) (string, string) {
 	lines := strings.Split(string(data), "\n")
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		// Look for: replace github.com/aocybersystems/eden-platform-go => ../eden-libs/eden-platform-go
+		// Look for: replace go.aocyber.ai/eden-platform-go => ../eden-libs/eden-platform-go
 		if strings.Contains(trimmed, "eden-platform-go") && strings.Contains(trimmed, "=>") {
 			parts := strings.Split(trimmed, "=>")
 			if len(parts) == 2 {
